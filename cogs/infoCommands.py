@@ -27,8 +27,14 @@ class InfoCommands(commands.Cog):
 
     
 
-    def convert_unix_timestamp(self ,timestamp: int) -> str:
-        return datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+    def convert_unix_timestamp(self, timestamp) -> str:
+        try:
+            if timestamp and str(timestamp).isdigit():
+                return datetime.utcfromtimestamp(int(timestamp)).strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                return str(timestamp) if timestamp else 'Not available'
+        except (ValueError, TypeError):
+            return str(timestamp) if timestamp else 'Not available'
 
 
 
@@ -212,8 +218,8 @@ class InfoCommands(commands.Cog):
                 f"**├─ Current BP Badges**: {basic_info.get('badgeCnt', 'Not found')}",
                 f"**├─ BR Rank**: {'' if basic_info.get('showBrRank') else 'Not found'} {basic_info.get('rankingPoints', '?')}",
                 f"**├─ CS Rank**: {'' if basic_info.get('showCsRank') else 'Not found'} {basic_info.get('csRankingPoints', '?')} ",
-                f"**├─ Created At**: {self.convert_unix_timestamp(int(basic_info.get('createAt', 'Not found')))}",
-                f"**└─ Last Login**: {self.convert_unix_timestamp(int(basic_info.get('lastLoginAt', 'Not found')))}"
+                f"**├─ Created At**: {self.convert_unix_timestamp(basic_info.get('createAt', 'Not found'))}",
+                f"**└─ Last Login**: {self.convert_unix_timestamp(basic_info.get('lastLoginAt', 'Not found'))}"
 
             ]), inline=False)
 
@@ -247,7 +253,7 @@ class InfoCommands(commands.Cog):
                         f"    **├─ Leader Name**: {captain_info.get('nickname', 'Not found')}",
                         f"    **├─ Leader UID**: `{captain_info.get('accountId', 'Not found')}`",
                         f"    **├─ Leader Level**: {captain_info.get('level', 'Not found')} (Exp: {captain_info.get('exp', '?')})",
-                        f"    **├─ Last Login**: {self.convert_unix_timestamp(int(captain_info.get('lastLoginAt', 'Not found')))}",
+                        f"    **├─ Last Login**: {self.convert_unix_timestamp(captain_info.get('lastLoginAt', 'Not found'))}",
                         f"    **├─ Title**: {captain_info.get('title', 'Not found')}",
                         f"    **├─ BP Badges**: {captain_info.get('badgeCnt', '?')}",
                         f"    **├─ BR Rank**: {'' if captain_info.get('showBrRank') else 'Not found'} {captain_info.get('rankingPoints', 'Not found')}",
@@ -257,7 +263,7 @@ class InfoCommands(commands.Cog):
 
 
 
-            embed.set_footer(text="DEVELOPED BY THUG")
+            embed.set_footer(text="DEVELOPED BY LINUX")
             await ctx.send(embed=embed)
 
             if region and uid:
@@ -324,17 +330,27 @@ class InfoCommands(commands.Cog):
                     )
                     
                     # Process the API response and create appropriate embed fields
-                    # Since we don't know the exact response structure, let's handle it dynamically
                     if isinstance(data, dict):
                         for key, value in data.items():
+                            # Handle timestamp conversions
+                            if 'at' in key.lower() and value and str(value).isdigit():
+                                # This is likely a timestamp field
+                                converted_time = self.convert_unix_timestamp(int(value))
+                                field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
+                                field_value = converted_time
+                            else:
+                                # Regular field
+                                field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
+                                field_value = str(value) if value is not None else "N/A"
+                            
                             # Limit field name length and value length for Discord embed limits
-                            field_name = str(key)[:256]  # Max field name length
-                            field_value = str(value)[:1024] if str(value) else "N/A"  # Max field value length
-                            embed.add_field(name=field_name.title(), value=field_value, inline=False)
+                            field_name = field_name[:256]  # Max field name length
+                            field_value = field_value[:1024]  # Max field value length
+                            embed.add_field(name=field_name, value=field_value, inline=False)
                     else:
                         embed.add_field(name="Response", value=str(data)[:1024], inline=False)
                     
-                    embed.set_footer(text="API v1 Check | DEVELOPED BY THUG")
+                    embed.set_footer(text="API v1 Check | DEVELOPED BY LINUX")
                     await ctx.send(embed=embed)
 
         except Exception as e:
