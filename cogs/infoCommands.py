@@ -174,90 +174,149 @@ class InfoCommands(commands.Cog):
 
         try:
             async with ctx.typing():
-                async with self.session.get(f"{self.api_url}?uid={uid}") as response:
+                async with self.session.get(f"https://api-info-v1.vercel.app/check?uid={uid}") as response:
                     if response.status == 404:
                         return await ctx.send(f" Player with UID `{uid}` not found.")
                     if response.status != 200:
                         return await ctx.send("API error. Try again later.")
                     data = await response.json()
-
             
-            basic_info = data.get('basicInfo', {})
-            captain_info = data.get('captainBasicInfo', {})
-            clan_info = data.get('clanBasicInfo', {})
-            credit_score_info = data.get('creditScoreInfo', {})
-            pet_info = data.get('petInfo', {})
-            profile_info = data.get('profileInfo', {})
-            social_info = data.get('socialInfo', {})
-
-
-            region = basic_info.get('region', 'Not found')
-
+            # Handle different possible response structures
+            # First, try the original structure
+            if 'basicInfo' in data:
+                # Original structure
+                basic_info = data.get('basicInfo', {})
+                captain_info = data.get('captainBasicInfo', {})
+                clan_info = data.get('clanBasicInfo', {})
+                credit_score_info = data.get('creditScoreInfo', {})
+                pet_info = data.get('petInfo', {})
+                profile_info = data.get('profileInfo', {})
+                social_info = data.get('socialInfo', {})
+            else:
+                # New API structure - try to adapt the data
+                # If the response is flat (direct properties), treat the whole response as basic info
+                basic_info = data
+                captain_info = {}
+                clan_info = {}
+                credit_score_info = {}
+                pet_info = {}
+                profile_info = {}
+                social_info = {}
+            
+            region = basic_info.get('region', basic_info.get('Region', 'Not found'))
+            
             embed = discord.Embed(
                 title=" Player Information",
                 color=discord.Color.blurple(),
                 timestamp=datetime.now()
             )
             embed.set_thumbnail(url=ctx.author.display_avatar.url)
-
-            embed.add_field(name="", value="\n".join([
+            
+            # Create basic info section with fallbacks
+            basic_info_fields = [
                 "**┌  ACCOUNT BASIC INFO**",
-                f"**├─ Name**: {basic_info.get('nickname', 'Not found')}",
+                f"**├─ Name**: {basic_info.get('nickname', basic_info.get('name', basic_info.get('playerName', 'Not found')))}",
                 f"**├─ UID**: `{uid}`",
-                f"**├─ Level**: {basic_info.get('level', 'Not found')} (Exp: {basic_info.get('exp', '?')})",
+                f"**├─ Level**: {basic_info.get('level', basic_info.get('playerLevel', 'Not found'))} (Exp: {basic_info.get('exp', basic_info.get('experience', '?'))})",
                 f"**├─ Region**: {region}",
-                f"**├─ Likes**: {basic_info.get('liked', 'Not found')}",
-                f"**├─ Honor Score**: {credit_score_info.get('creditScore', 'Not found')}",
-                f"**└─ Signature**: {social_info.get('signature', 'None') or 'None'}"
-            ]), inline=False)
-          
-
-            embed.add_field(name="", value="\n".join([
+                f"**├─ Likes**: {basic_info.get('liked', basic_info.get('likes', 'Not found'))}",
+                f"**├─ Honor Score**: {credit_score_info.get('creditScore', basic_info.get('honorScore', 'Not found'))}",
+                f"**└─ Signature**: {social_info.get('signature', basic_info.get('signature', 'None') or 'None')}"
+            ]
+            embed.add_field(name="", value="\n".join(basic_info_fields), inline=False)
+                      
+            
+            # Create activity section with fallbacks
+            activity_fields = [
                 "**┌  ACCOUNT ACTIVITY**",
-                f"**├─ Most Recent OB**: {basic_info.get('releaseVersion', '?')}",
-                f"**├─ Current BP Badges**: {basic_info.get('badgeCnt', 'Not found')}",
-                f"**├─ BR Rank**: {'' if basic_info.get('showBrRank') else 'Not found'} {basic_info.get('rankingPoints', '?')}",
-                f"**├─ CS Rank**: {'' if basic_info.get('showCsRank') else 'Not found'} {basic_info.get('csRankingPoints', '?')} ",
-                f"**├─ Created At**: {self.convert_unix_timestamp(basic_info.get('createAt', 'Not found'))}",
-                f"**└─ Last Login**: {self.convert_unix_timestamp(basic_info.get('lastLoginAt', 'Not found'))}"
-
-            ]), inline=False)
-
-            embed.add_field(name="", value="\n".join([
+                f"**├─ Most Recent OB**: {basic_info.get('releaseVersion', basic_info.get('latestOB', '?'))}",
+                f"**├─ Current BP Badges**: {basic_info.get('badgeCnt', basic_info.get('badges', 'Not found'))}",
+                f"**├─ BR Rank**: {'' if basic_info.get('showBrRank', True) else 'Not found'} {basic_info.get('rankingPoints', basic_info.get('brRank', '?'))} ",
+                f"**├─ CS Rank**: {'' if basic_info.get('showCsRank', True) else 'Not found'} {basic_info.get('csRankingPoints', basic_info.get('csRank', '?'))} ",
+                f"**├─ Created At**: {self.convert_unix_timestamp(basic_info.get('createAt', basic_info.get('createdAt', 'Not found')))}",
+                f"**└─ Last Login**: {self.convert_unix_timestamp(basic_info.get('lastLoginAt', basic_info.get('lastLoginTime', 'Not found')))}"
+            ]
+            embed.add_field(name="", value="\n".join(activity_fields), inline=False)
+            
+            # Create overview section with fallbacks
+            overview_fields = [
                 "**┌  ACCOUNT OVERVIEW**",
-                f"**├─ Avatar ID**: {profile_info.get('avatarId', 'Not found')}",
-                f"**├─ Banner ID**: {basic_info.get('bannerId', 'Not found')}",
-                f"**├─ Pin ID**: {captain_info.get('pinId', 'Not found') if captain_info else 'Default'}",
-                f"**└─ Equipped Skills**: {profile_info.get('equipedSkills', 'Not found')}"
-            ]), inline=False)
-
-            embed.add_field(name="", value="\n".join([
+                f"**├─ Avatar ID**: {profile_info.get('avatarId', basic_info.get('avatarId', 'Not found'))}",
+                f"**├─ Banner ID**: {basic_info.get('bannerId', basic_info.get('bannerId', 'Not found'))}",
+                f"**├─ Pin ID**: {captain_info.get('pinId', basic_info.get('pinId', 'Default')) if captain_info else 'Default'}",
+                f"**└─ Equipped Skills**: {profile_info.get('equipedSkills', basic_info.get('equippedSkills', 'Not found'))}"
+            ]
+            embed.add_field(name="", value="\n".join(overview_fields), inline=False)
+            
+            # Create pet details section with fallbacks
+            pet_fields = [
                 "**┌  PET DETAILS**",
-                f"**├─ Equipped?**: {'Yes' if pet_info.get('isSelected') else 'Not Found'}",
-                f"**├─ Pet Name**: {pet_info.get('name', 'Not Found')}",
-                f"**├─ Pet Exp**: {pet_info.get('exp', 'Not Found')}",
-                f"**└─ Pet Level**: {pet_info.get('level', 'Not Found')}"
-            ]), inline=False)
-
-            if clan_info:
+                f"**├─ Equipped?**: {'Yes' if pet_info.get('isSelected', basic_info.get('petEquipped', False)) else 'Not Found'}",
+                f"**├─ Pet Name**: {pet_info.get('name', basic_info.get('petName', 'Not Found') if pet_info else 'Not Found')}",
+                f"**├─ Pet Exp**: {pet_info.get('exp', basic_info.get('petExp', 'Not Found'))}",
+                f"**└─ Pet Level**: {pet_info.get('level', basic_info.get('petLevel', 'Not Found'))}"
+            ]
+            embed.add_field(name="", value="\n".join(pet_fields), inline=False)
+            
+            # Add any additional fields from the API response that weren't covered above
+            all_api_keys = set()
+            for d in [data, basic_info, captain_info, clan_info, credit_score_info, pet_info, profile_info, social_info]:
+                if isinstance(d, dict):
+                    all_api_keys.update(d.keys())
+                        
+            # Define keys that are already displayed
+            displayed_keys = {
+                'nickname', 'name', 'playerName', 'uid', 'level', 'playerLevel', 'exp', 'experience',
+                'region', 'Region', 'liked', 'likes', 'creditScore', 'honorScore', 'signature',
+                'releaseVersion', 'latestOB', 'badgeCnt', 'badges', 'rankingPoints', 'brRank',
+                'csRank', 'showBrRank', 'showCsRank', 'createAt', 'createdAt', 'lastLoginAt',
+                'lastLoginTime', 'avatarId', 'bannerId', 'pinId', 'equipedSkills', 'equippedSkills',
+                'isSelected', 'petEquipped', 'petName', 'petExp', 'petLevel', 'clanName', 'clanId',
+                'id', 'clanLevel', 'level', 'memberNum', 'members', 'capacity', 'maxMembers',
+                'accountId', 'title', 'exp', 'badgeCnt', 'badges', 'showBrRank', 'showCsRank',
+                'rankingPoints', 'brRank', 'csRankingPoints', 'csRank', 'basicInfo', 'captainBasicInfo',
+                'clanBasicInfo', 'creditScoreInfo', 'petInfo', 'profileInfo', 'socialInfo',
+                'captainInfo', 'clanInfo'
+            }
+                        
+            # Find additional keys not already displayed
+            additional_keys = all_api_keys - displayed_keys
+                        
+            if additional_keys:
+                additional_fields = ["**┌  ADDITIONAL DATA**"]
+                for key in sorted(additional_keys):
+                    if key not in ['basicInfo', 'captainBasicInfo', 'clanBasicInfo', 'creditScoreInfo', 'petInfo', 'profileInfo', 'socialInfo']:
+                        value = data.get(key, 'N/A')
+                        if 'at' in key.lower() and str(value).isdigit():
+                            value = self.convert_unix_timestamp(value)
+                        field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
+                        additional_fields.append(f"**├─ {field_name}**: {value}")
+                additional_fields.append("**└─**")
+                embed.add_field(name="", value="\n".join(additional_fields), inline=False)
+            
+            # Handle clan info
+            final_clan_info = clan_info if clan_info else (data.get('clanInfo', {}) if 'clanInfo' in data else data.get('clan', {}))
+            final_captain_info = captain_info if captain_info else (data.get('captainInfo', {}) if 'captainInfo' in data else data.get('captain', {}))
+                        
+            if final_clan_info:
                 guild_info = [
                     "**┌  GUILD INFO**",
-                    f"**├─ Guild Name**: {clan_info.get('clanName', 'Not found')}",
-                    f"**├─ Guild ID**: `{clan_info.get('clanId', 'Not found')}`",
-                    f"**├─ Guild Level**: {clan_info.get('clanLevel', 'Not found')}",
-                    f"**├─ Live Members**: {clan_info.get('memberNum', 'Not found')}/{clan_info.get('capacity', '?')}"
+                    f"**├─ Guild Name**: {final_clan_info.get('clanName', final_clan_info.get('name', 'Not found'))}",
+                    f"**├─ Guild ID**: `{final_clan_info.get('clanId', final_clan_info.get('id', 'Not found'))}`",
+                    f"**├─ Guild Level**: {final_clan_info.get('clanLevel', final_clan_info.get('level', 'Not found'))}",
+                    f"**├─ Live Members**: {final_clan_info.get('memberNum', final_clan_info.get('members', 'Not found'))}/{final_clan_info.get('capacity', final_clan_info.get('maxMembers', '?'))}"
                 ]
-                if captain_info:
+                if final_captain_info:
                     guild_info.extend([
                         "**└─ Leader Info**:",
-                        f"    **├─ Leader Name**: {captain_info.get('nickname', 'Not found')}",
-                        f"    **├─ Leader UID**: `{captain_info.get('accountId', 'Not found')}`",
-                        f"    **├─ Leader Level**: {captain_info.get('level', 'Not found')} (Exp: {captain_info.get('exp', '?')})",
-                        f"    **├─ Last Login**: {self.convert_unix_timestamp(captain_info.get('lastLoginAt', 'Not found'))}",
-                        f"    **├─ Title**: {captain_info.get('title', 'Not found')}",
-                        f"    **├─ BP Badges**: {captain_info.get('badgeCnt', '?')}",
-                        f"    **├─ BR Rank**: {'' if captain_info.get('showBrRank') else 'Not found'} {captain_info.get('rankingPoints', 'Not found')}",
-                        f"    **└─ CS Rank**: {'' if captain_info.get('showCsRank') else 'Not found'} {captain_info.get('csRankingPoints', 'Not found')} "
+                        f"    **├─ Leader Name**: {final_captain_info.get('nickname', final_captain_info.get('name', 'Not found'))}",
+                        f"    **├─ Leader UID**: `{final_captain_info.get('accountId', final_captain_info.get('id', 'Not found'))}`",
+                        f"    **├─ Leader Level**: {final_captain_info.get('level', final_captain_info.get('level', 'Not found'))} (Exp: {final_captain_info.get('exp', final_captain_info.get('experience', '?'))})",
+                        f"    **├─ Last Login**: {self.convert_unix_timestamp(final_captain_info.get('lastLoginAt', final_captain_info.get('lastLoginTime', 'Not found')))}",
+                        f"    **├─ Title**: {final_captain_info.get('title', final_captain_info.get('title', 'Not found'))}",
+                        f"    **├─ BP Badges**: {final_captain_info.get('badgeCnt', final_captain_info.get('badges', '?'))}",
+                        f"    **├─ BR Rank**: {'' if final_captain_info.get('showBrRank', True) else 'Not found'} {final_captain_info.get('rankingPoints', final_captain_info.get('brRank', 'Not found'))}",
+                        f"    **└─ CS Rank**: {'' if final_captain_info.get('showCsRank', True) else 'Not found'} {final_captain_info.get('csRankingPoints', final_captain_info.get('csRank', 'Not found'))} "
                     ])
                 embed.add_field(name="", value="\n".join(guild_info), inline=False)
 
