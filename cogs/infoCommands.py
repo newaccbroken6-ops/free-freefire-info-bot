@@ -439,7 +439,7 @@ class InfoCommands(commands.Cog):
                 inline=True
             )
 
-            embed.set_footer(text=f"DEVELOPED BY LINUX • Requested by {ctx.author.display_name}")
+            embed.set_footer(text=f"DEVELOPED BY LINUXxx• Requested by {ctx.author.display_name}")
             
             await ctx.send(embed=embed)
 
