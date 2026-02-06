@@ -230,58 +230,84 @@ class InfoCommands(commands.Cog):
                 if not basic_info and isinstance(data, dict):
                     basic_info = data
             
-            region = basic_info.get('region', basic_info.get('Region', 'Not found'))
-            
+            # Extract all possible values with extensive fallbacks based on the API response structure
+            nickname = basic_info.get('nickname', basic_info.get('name', basic_info.get('playerName', data.get('nickname', data.get('name', 'Not found')))))
+            region = basic_info.get('region', basic_info.get('Region', data.get('region', data.get('Region', 'Not found'))))
+            level = basic_info.get('level', basic_info.get('playerLevel', basic_info.get('AccountLevel', data.get('level', data.get('playerLevel', 'Not found')))))
+            exp = basic_info.get('exp', basic_info.get('experience', basic_info.get('Exp', data.get('exp', data.get('experience', '?')))))
+            liked = basic_info.get('liked', basic_info.get('likes', basic_info.get('Likes', data.get('liked', data.get('likes', 'Not found')))))
+            honor_score = credit_score_info.get('creditScore', basic_info.get('honorScore', basic_info.get('CreditScore', data.get('creditScore', data.get('honorScore', 'Not found')))))
+            signature = social_info.get('signature', basic_info.get('signature', basic_info.get('Signature', data.get('signature', 'None') or 'None')))
+            release_version = basic_info.get('releaseVersion', basic_info.get('latestOB', basic_info.get('ReleaseVersion', data.get('releaseVersion', data.get('latestOB', '?')))))
+            badge_count = basic_info.get('badgeCnt', basic_info.get('badges', basic_info.get('BadgeCount', data.get('badgeCnt', data.get('badges', 'Not found')))))
+            br_rank_points = basic_info.get('rankingPoints', basic_info.get('brRank', basic_info.get('BrRankPoints', data.get('rankingPoints', data.get('brRank', '?')))))
+            cs_rank_points = basic_info.get('csRankingPoints', basic_info.get('csRank', basic_info.get('CsRankPoints', data.get('csRankingPoints', data.get('csRank', '?')))))
+            created_at = basic_info.get('createAt', basic_info.get('createdAt', basic_info.get('CreateAt', data.get('createAt', data.get('createdAt', 'Not found')))))
+            last_login = basic_info.get('lastLoginAt', basic_info.get('lastLoginTime', basic_info.get('LastLoginAt', data.get('lastLoginAt', data.get('lastLoginTime', 'Not found')))))
+            avatar_id = profile_info.get('avatarId', basic_info.get('avatarId', basic_info.get('AvatarId', data.get('avatarId', data.get('AvatarId', 'Not found')))))
+            banner_id = basic_info.get('bannerId', basic_info.get('BannerId', data.get('bannerId', data.get('BannerId', 'Not found'))))
+            pin_id_raw = captain_info.get('pinId', basic_info.get('pinId', basic_info.get('PinId', data.get('pinId', data.get('PinId', 'Default')))))
+            pin_id = pin_id_raw if captain_info else 'Default'
+            equipped_skills = profile_info.get('equipedSkills', basic_info.get('equippedSkills', basic_info.get('EquippedSkills', data.get('equipedSkills', data.get('equippedSkills', 'Not found')))))
+            pet_equipped_nested = data.get('petEquipped', False)
+            pet_equipped = pet_info.get('isSelected', basic_info.get('petEquipped', basic_info.get('PetEquipped', data.get('isSelected', pet_equipped_nested))))
+            pet_name_raw = pet_info.get('name', basic_info.get('petName', basic_info.get('PetName', data.get('name', data.get('petName', 'Not Found')))))
+            pet_name = pet_name_raw if pet_info else 'Not Found'
+            pet_exp = pet_info.get('exp', basic_info.get('petExp', basic_info.get('PetExp', data.get('exp', data.get('petExp', 'Not Found')))))
+            pet_level = pet_info.get('level', basic_info.get('petLevel', basic_info.get('PetLevel', data.get('level', data.get('petLevel', 'Not Found')))))
+
             embed = discord.Embed(
                 title=" Player Information",
                 color=discord.Color.blurple(),
                 timestamp=datetime.now()
             )
             embed.set_thumbnail(url=ctx.author.display_avatar.url)
-            
-            # Create basic info section with fallbacks
+
+            # Create basic info section with extensive fallbacks
             basic_info_fields = [
                 "**┌  ACCOUNT BASIC INFO**",
-                f"**├─ Name**: {basic_info.get('nickname', basic_info.get('name', basic_info.get('playerName', 'Not found')))}",
+                f"**├─ Name**: {nickname}",
                 f"**├─ UID**: `{uid}`",
-                f"**├─ Level**: {basic_info.get('level', basic_info.get('playerLevel', 'Not found'))} (Exp: {basic_info.get('exp', basic_info.get('experience', '?'))})",
+                f"**├─ Level**: {level} (Exp: {exp})",
                 f"**├─ Region**: {region}",
-                f"**├─ Likes**: {basic_info.get('liked', basic_info.get('likes', 'Not found'))}",
-                f"**├─ Honor Score**: {credit_score_info.get('creditScore', basic_info.get('honorScore', 'Not found'))}",
-                f"**└─ Signature**: {social_info.get('signature', basic_info.get('signature', 'None') or 'None')}"
+                f"**├─ Likes**: {liked}",
+                f"**├─ Honor Score**: {honor_score}",
+                f"**└─ Signature**: {signature}"
             ]
             embed.add_field(name="", value="\n".join(basic_info_fields), inline=False)
-                      
-            
-            # Create activity section with fallbacks
+          
+
+
+            # Create activity section with extensive fallbacks
             activity_fields = [
                 "**┌  ACCOUNT ACTIVITY**",
-                f"**├─ Most Recent OB**: {basic_info.get('releaseVersion', basic_info.get('latestOB', '?'))}",
-                f"**├─ Current BP Badges**: {basic_info.get('badgeCnt', basic_info.get('badges', 'Not found'))}",
-                f"**├─ BR Rank**: {'' if basic_info.get('showBrRank', True) else 'Not found'} {basic_info.get('rankingPoints', basic_info.get('brRank', '?'))} ",
-                f"**├─ CS Rank**: {'' if basic_info.get('showCsRank', True) else 'Not found'} {basic_info.get('csRankingPoints', basic_info.get('csRank', '?'))} ",
-                f"**├─ Created At**: {self.convert_unix_timestamp(basic_info.get('createAt', basic_info.get('createdAt', 'Not found')))}",
-                f"**└─ Last Login**: {self.convert_unix_timestamp(basic_info.get('lastLoginAt', basic_info.get('lastLoginTime', 'Not found')))}"
+                f"**├─ Most Recent OB**: {release_version}",
+                f"**├─ Current BP Badges**: {badge_count}",
+                f"**├─ BR Rank**: {'' if basic_info.get('showBrRank', True) else 'Not found'} {br_rank_points} ",
+                f"**├─ CS Rank**: {'' if basic_info.get('showCsRank', True) else 'Not found'} {cs_rank_points} ",
+                f"**├─ Created At**: {self.convert_unix_timestamp(created_at)}",
+                f"**└─ Last Login**: {self.convert_unix_timestamp(last_login)}"
+
             ]
             embed.add_field(name="", value="\n".join(activity_fields), inline=False)
-            
-            # Create overview section with fallbacks
+
+            # Create overview section with extensive fallbacks
             overview_fields = [
                 "**┌  ACCOUNT OVERVIEW**",
-                f"**├─ Avatar ID**: {profile_info.get('avatarId', basic_info.get('avatarId', 'Not found'))}",
-                f"**├─ Banner ID**: {basic_info.get('bannerId', basic_info.get('bannerId', 'Not found'))}",
-                f"**├─ Pin ID**: {captain_info.get('pinId', basic_info.get('pinId', 'Default')) if captain_info else 'Default'}",
-                f"**└─ Equipped Skills**: {profile_info.get('equipedSkills', basic_info.get('equippedSkills', 'Not found'))}"
+                f"**├─ Avatar ID**: {avatar_id}",
+                f"**├─ Banner ID**: {banner_id}",
+                f"**├─ Pin ID**: {pin_id}",
+                f"**└─ Equipped Skills**: {equipped_skills}"
             ]
             embed.add_field(name="", value="\n".join(overview_fields), inline=False)
-            
-            # Create pet details section with fallbacks
+
+            # Create pet details section with extensive fallbacks
             pet_fields = [
                 "**┌  PET DETAILS**",
-                f"**├─ Equipped?**: {'Yes' if pet_info.get('isSelected', basic_info.get('petEquipped', False)) else 'Not Found'}",
-                f"**├─ Pet Name**: {pet_info.get('name', basic_info.get('petName', 'Not Found') if pet_info else 'Not Found')}",
-                f"**├─ Pet Exp**: {pet_info.get('exp', basic_info.get('petExp', 'Not Found'))}",
-                f"**└─ Pet Level**: {pet_info.get('level', basic_info.get('petLevel', 'Not Found'))}"
+                f"**├─ Equipped?**: {'Yes' if pet_equipped else 'Not Found'}",
+                f"**├─ Pet Name**: {pet_name}",
+                f"**├─ Pet Exp**: {pet_exp}",
+                f"**└─ Pet Level**: {pet_level}"
             ]
             embed.add_field(name="", value="\n".join(pet_fields), inline=False)
             
