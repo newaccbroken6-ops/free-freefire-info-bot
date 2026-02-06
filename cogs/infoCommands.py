@@ -17,7 +17,7 @@ CONFIG_FILE = "info_channels.json"
 class InfoCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.api_url = "https://api-info-v1.vercel.app/check?uid={uid}"
+        self.api_url = "https://api-info-v1.vercel.app/check"
         self.generate_url = "http://profile.thug4ff.com/api/profile"
         self.session = aiohttp.ClientSession()
         self.config_data = self.load_config()
@@ -281,6 +281,66 @@ class InfoCommands(commands.Cog):
         finally:
             gc.collect()
 
+    @commands.hybrid_command(name="check", description="Check Free Fire account info using API v1")
+    @app_commands.describe(uid="FREE FIRE UID to check")
+    async def check_api_v1(self, ctx: commands.Context, uid: str):
+        """Command to use the new API endpoint you provided"""
+        guild_id = str(ctx.guild.id)
+
+        if not uid.isdigit() or len(uid) < 6:
+            return await ctx.reply(" Invalid UID! It must:\n- Be only numbers\n- Have at least 6 digits", mention_author=False)
+
+        if not await self.is_channel_allowed(ctx):
+            return await ctx.send(" This command is not allowed in this channel.", ephemeral=True)
+
+        cooldown = self.config_data["global_settings"]["default_cooldown"]
+        if guild_id in self.config_data["servers"]:
+            cooldown = self.config_data["servers"][guild_id]["config"].get("cooldown", cooldown)
+
+        if ctx.author.id in self.cooldowns:
+            last_used = self.cooldowns[ctx.author.id]
+            if (datetime.now() - last_used).seconds < cooldown:
+                remaining = cooldown - (datetime.now() - last_used).seconds
+                return await ctx.send(f" Please wait {remaining}s before using this command again", ephemeral=True)
+
+        self.cooldowns[ctx.author.id] = datetime.now()
+
+        try:
+            async with ctx.typing():
+                # Use the new API endpoint you provided
+                async with self.session.get(f"https://api-info-v1.vercel.app/check?uid={uid}") as response:
+                    if response.status == 404:
+                        return await ctx.send(f" Player with UID `{uid}` not found.")
+                    if response.status != 200:
+                        return await ctx.send("API error. Try again later.")
+                    
+                    data = await response.json()
+                    
+                    # Create embed based on API response
+                    embed = discord.Embed(
+                        title="Player Check Result",
+                        color=discord.Color.green(),
+                        timestamp=datetime.now()
+                    )
+                    
+                    # Process the API response and create appropriate embed fields
+                    # Since we don't know the exact response structure, let's handle it dynamically
+                    if isinstance(data, dict):
+                        for key, value in data.items():
+                            # Limit field name length and value length for Discord embed limits
+                            field_name = str(key)[:256]  # Max field name length
+                            field_value = str(value)[:1024] if str(value) else "N/A"  # Max field value length
+                            embed.add_field(name=field_name.title(), value=field_value, inline=False)
+                    else:
+                        embed.add_field(name="Response", value=str(data)[:1024], inline=False)
+                    
+                    embed.set_footer(text="API v1 Check | DEVELOPED BY THUG")
+                    await ctx.send(embed=embed)
+
+        except Exception as e:
+            await ctx.send(f" Unexpected error: `{e}`")
+        finally:
+            gc.collect()
 
     async def cog_unload(self):
         await self.session.close()
