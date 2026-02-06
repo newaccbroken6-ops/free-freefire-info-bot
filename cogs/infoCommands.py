@@ -287,10 +287,17 @@ class InfoCommands(commands.Cog):
                 for key in sorted(additional_keys):
                     if key not in ['basicInfo', 'captainBasicInfo', 'clanBasicInfo', 'creditScoreInfo', 'petInfo', 'profileInfo', 'socialInfo']:
                         value = data.get(key, 'N/A')
+                        # Convert timestamp if needed
                         if 'at' in key.lower() and str(value).isdigit():
                             value = self.convert_unix_timestamp(value)
+                        # Ensure value is a string and limit its length
+                        value_str = str(value)[:100]  # Limit individual value length
                         field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
-                        additional_fields.append(f"**├─ {field_name}**: {value}")
+                        # Ensure the entire field string doesn't exceed limits
+                        field_str = f"**├─ {field_name}**: {value_str}"
+                        if len(field_str) > 1024:
+                            field_str = field_str[:1020] + "..."
+                        additional_fields.append(field_str)
                 additional_fields.append("**└─**")
                 embed.add_field(name="", value="\n".join(additional_fields), inline=False)
             
@@ -405,6 +412,15 @@ class InfoCommands(commands.Cog):
                             # Limit field name length and value length for Discord embed limits
                             field_name = field_name[:256]  # Max field name length
                             field_value = field_value[:1024]  # Max field value length
+                            
+                            # Ensure the total field string doesn't exceed limits
+                            total_field_length = len(field_name) + len(field_value)
+                            if total_field_length > 1024:
+                                # Reduce the value length to fit within limits
+                                available_space = 1024 - len(field_name) - 10  # Leave some space for formatting
+                                if available_space > 0:
+                                    field_value = field_value[:available_space] + "..."
+                            
                             embed.add_field(name=field_name, value=field_value, inline=False)
                     else:
                         embed.add_field(name="Response", value=str(data)[:1024], inline=False)
