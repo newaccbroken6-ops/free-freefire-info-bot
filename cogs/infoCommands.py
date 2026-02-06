@@ -460,6 +460,16 @@ class InfoCommands(commands.Cog):
                 except Exception as e:
                     print("Image generation failed:", e)
 
+            # Send the egirl-discord.gif after the info command
+            gif_path = "egirl-discord.gif"
+            if os.path.exists(gif_path):
+                try:
+                    gif_file = discord.File(gif_path)
+                    await ctx.send(file=gif_file)
+                    print("GIF sent successfully")
+                except Exception as e:
+                    print("GIF sending failed:", e)
+
         except Exception as e:
             await ctx.send(f" Unexpected error: `{e}`")
         finally:
@@ -591,6 +601,16 @@ class InfoCommands(commands.Cog):
                     
                     embed.set_footer(text="API v1 Check | DEVELOPED BY LINUX")
                     await ctx.send(embed=embed)
+
+            # Send the egirl-discord.gif after the check command
+            gif_path = "egirl-discord.gif"
+            if os.path.exists(gif_path):
+                try:
+                    gif_file = discord.File(gif_path)
+                    await ctx.send(file=gif_file)
+                    print("GIF sent successfully")
+                except Exception as e:
+                    print("GIF sending failed:", e)
 
         except Exception as e:
             await ctx.send(f" Unexpected error: `{e}`")
