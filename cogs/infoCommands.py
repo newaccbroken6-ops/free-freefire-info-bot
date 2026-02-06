@@ -150,6 +150,10 @@ class InfoCommands(commands.Cog):
     @app_commands.describe(uid="FREE FIRE INFO")
     async def player_info(self, ctx: commands.Context, uid: str):
         guild_id = str(ctx.guild.id)
+        
+        # Restrict to specific channel
+        if str(ctx.channel.id) != "1449152600518819993":
+            return await ctx.send(" This command can only be used in the designated channel.", ephemeral=True)
 
         if not uid.isdigit() or len(uid) < 6:
             return await ctx.reply(" Invalid UID! It must:\n- Be only numbers\n- Have at least 6 digits", mention_author=False)
@@ -439,7 +443,7 @@ class InfoCommands(commands.Cog):
                 inline=True
             )
 
-            embed.set_footer(text=f"DEVELOPED BY LINUXxx• Requested by {ctx.author.display_name}")
+            embed.set_footer(text=f"DEVELOPED BY LINUX • Requested by {ctx.author.display_name}")
             
             await ctx.send(embed=embed)
 
@@ -480,6 +484,10 @@ class InfoCommands(commands.Cog):
     async def check_api_v1(self, ctx: commands.Context, uid: str):
         """Command to use the new API endpoint you provided"""
         guild_id = str(ctx.guild.id)
+        
+        # Restrict to specific channel
+        if str(ctx.channel.id) != "1449152600518819993":
+            return await ctx.send(" This command can only be used in the designated channel.", ephemeral=True)
 
         if not uid.isdigit() or len(uid) < 6:
             return await ctx.reply(" Invalid UID! It must:\n- Be only numbers\n- Have at least 6 digits", mention_author=False)
