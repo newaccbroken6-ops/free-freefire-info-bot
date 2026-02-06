@@ -182,9 +182,9 @@ class InfoCommands(commands.Cog):
                     data = await response.json()
             
             # Handle different possible response structures
-            # First, try the original structure
+            # Based on the API response you shared, let's handle the actual structure
             if 'basicInfo' in data:
-                # Original structure
+                # Traditional structure
                 basic_info = data.get('basicInfo', {})
                 captain_info = data.get('captainBasicInfo', {})
                 clan_info = data.get('clanBasicInfo', {})
@@ -192,16 +192,43 @@ class InfoCommands(commands.Cog):
                 pet_info = data.get('petInfo', {})
                 profile_info = data.get('profileInfo', {})
                 social_info = data.get('socialInfo', {})
-            else:
-                # New API structure - try to adapt the data
-                # If the response is flat (direct properties), treat the whole response as basic info
-                basic_info = data
+            elif 'rawApiResponse' in data or 'formattedResponse' in data:
+                # Structure with rawApiResponse and formattedResponse
+                raw_response = data.get('rawApiResponse', data.get('basicInfo', {}))
+                formatted_response = data.get('formattedResponse', data.get('basicInfo', {}))
+                
+                # Use formatted response as primary source, fallback to raw response
+                basic_info = {**raw_response, **formatted_response}  # Merge both, formatted takes precedence
                 captain_info = {}
                 clan_info = {}
                 credit_score_info = {}
                 pet_info = {}
                 profile_info = {}
                 social_info = {}
+            else:
+                # Direct structure - try to identify and extract the actual data
+                basic_info = {}
+                captain_info = {}
+                clan_info = {}
+                credit_score_info = {}
+                pet_info = {}
+                profile_info = {}
+                social_info = {}
+                
+                # Look for known fields in the top level response
+                for key, value in data.items():
+                    if isinstance(value, dict):
+                        # Check if this nested object contains player info
+                        if any(player_key in value for player_key in ['accountId', 'nickname', 'level']):
+                            if 'accountId' in value:
+                                basic_info = value
+                                break
+                    elif key in ['nickname', 'accountId', 'region', 'level', 'exp', 'liked']:
+                        basic_info[key] = value
+                
+                # If we couldn't find basic info in nested objects, use the top level
+                if not basic_info and isinstance(data, dict):
+                    basic_info = data
             
             region = basic_info.get('region', basic_info.get('Region', 'Not found'))
             
@@ -397,31 +424,82 @@ class InfoCommands(commands.Cog):
                     
                     # Process the API response and create appropriate embed fields
                     if isinstance(data, dict):
-                        for key, value in data.items():
-                            # Handle timestamp conversions
-                            if 'at' in key.lower() and value and str(value).isdigit():
-                                # This is likely a timestamp field
-                                converted_time = self.convert_unix_timestamp(int(value))
-                                field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
-                                field_value = converted_time
-                            else:
-                                # Regular field
-                                field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
-                                field_value = str(value) if value is not None else "N/A"
-                            
-                            # Limit field name length and value length for Discord embed limits
-                            field_name = field_name[:256]  # Max field name length
-                            field_value = field_value[:1024]  # Max field value length
-                            
-                            # Ensure the total field string doesn't exceed limits
-                            total_field_length = len(field_name) + len(field_value)
-                            if total_field_length > 1024:
-                                # Reduce the value length to fit within limits
-                                available_space = 1024 - len(field_name) - 10  # Leave some space for formatting
-                                if available_space > 0:
-                                    field_value = field_value[:available_space] + "..."
-                            
-                            embed.add_field(name=field_name, value=field_value, inline=False)
+                        # Handle special nested structures like rawApiResponse and formattedResponse
+                        if 'rawApiResponse' in data or 'formattedResponse' in data:
+                            # Flatten these nested structures
+                            for key, value in data.items():
+                                if isinstance(value, dict):
+                                    # Add nested fields with prefixes
+                                    for nested_key, nested_value in value.items():
+                                        field_name = f"{key.replace('Response', '')}.{nested_key}".replace('Api.', 'API ').replace('formatted.', 'Formatted ').title()
+                                        field_value = str(nested_value) if nested_value is not None else "N/A"
+                                        
+                                        # Handle timestamp conversions
+                                        if 'at' in nested_key.lower() and str(nested_value).isdigit():
+                                            field_value = self.convert_unix_timestamp(nested_value)
+                                        
+                                        # Limit field name length and value length for Discord embed limits
+                                        field_name = field_name[:256]  # Max field name length
+                                        field_value = field_value[:1024]  # Max field value length
+                                        
+                                        # Ensure the total field string doesn't exceed limits
+                                        total_field_length = len(field_name) + len(field_value)
+                                        if total_field_length > 1024:
+                                            # Reduce the value length to fit within limits
+                                            available_space = 1024 - len(field_name) - 10  # Leave some space for formatting
+                                            if available_space > 0:
+                                                field_value = field_value[:available_space] + "..."
+                                        
+                                        embed.add_field(name=field_name, value=field_value, inline=False)
+                                else:
+                                    # Handle direct fields
+                                    field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
+                                    field_value = str(value) if value is not None else "N/A"
+                                    
+                                    # Handle timestamp conversions
+                                    if 'at' in key.lower() and str(value).isdigit():
+                                        field_value = self.convert_unix_timestamp(value)
+                                    
+                                    # Limit field name length and value length for Discord embed limits
+                                    field_name = field_name[:256]  # Max field name length
+                                    field_value = field_value[:1024]  # Max field value length
+                                    
+                                    # Ensure the total field string doesn't exceed limits
+                                    total_field_length = len(field_name) + len(field_value)
+                                    if total_field_length > 1024:
+                                        # Reduce the value length to fit within limits
+                                        available_space = 1024 - len(field_name) - 10  # Leave some space for formatting
+                                        if available_space > 0:
+                                            field_value = field_value[:available_space] + "..."
+                                    
+                                    embed.add_field(name=field_name, value=field_value, inline=False)
+                        else:
+                            # Process normal dictionary structure
+                            for key, value in data.items():
+                                # Handle timestamp conversions
+                                if 'at' in key.lower() and value and str(value).isdigit():
+                                    # This is likely a timestamp field
+                                    converted_time = self.convert_unix_timestamp(int(value))
+                                    field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
+                                    field_value = converted_time
+                                else:
+                                    # Regular field
+                                    field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
+                                    field_value = str(value) if value is not None else "N/A"
+                                
+                                # Limit field name length and value length for Discord embed limits
+                                field_name = field_name[:256]  # Max field name length
+                                field_value = field_value[:1024]  # Max field value length
+                                
+                                # Ensure the total field string doesn't exceed limits
+                                total_field_length = len(field_name) + len(field_value)
+                                if total_field_length > 1024:
+                                    # Reduce the value length to fit within limits
+                                    available_space = 1024 - len(field_name) - 10  # Leave some space for formatting
+                                    if available_space > 0:
+                                        field_value = field_value[:available_space] + "..."
+                                
+                                embed.add_field(name=field_name, value=field_value, inline=False)
                     else:
                         embed.add_field(name="Response", value=str(data)[:1024], inline=False)
                     
