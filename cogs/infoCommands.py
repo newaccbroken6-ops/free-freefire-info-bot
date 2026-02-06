@@ -157,8 +157,6 @@ class InfoCommands(commands.Cog):
         if not await self.is_channel_allowed(ctx):
             return await ctx.send(" This command is not allowed in this channel.", ephemeral=True)
 
-
-
         cooldown = self.config_data["global_settings"]["default_cooldown"]
         if guild_id in self.config_data["servers"]:
             cooldown = self.config_data["servers"][guild_id]["config"].get("cooldown", cooldown)
@@ -171,7 +169,6 @@ class InfoCommands(commands.Cog):
 
         self.cooldowns[ctx.author.id] = datetime.now()
        
-
         try:
             async with ctx.typing():
                 async with self.session.get(f"https://api-info-v1.vercel.app/check?uid={uid}") as response:
@@ -181,223 +178,285 @@ class InfoCommands(commands.Cog):
                         return await ctx.send("API error. Try again later.")
                     data = await response.json()
             
-            # Handle different possible response structures
-            # Based on the API response you shared, let's handle the actual structure
-            if 'basicInfo' in data:
-                # Traditional structure
+            # Extract data from the new API format
+            if 'formatted_response' in data or 'raw_api_response' in data:
+                formatted_response = data.get('formatted_response', {})
+                raw_api_response = data.get('raw_api_response', {})
+                responding_region = data.get('responding_region', 'Unknown')
+                
+                # Extract basic info
+                basic_info = raw_api_response.get('basicInfo', {})
+                clan_info = raw_api_response.get('clanBasicInfo', {})
+                credit_score_info = raw_api_response.get('creditScoreInfo', {})
+                pet_info = raw_api_response.get('petInfo', {})
+                profile_info = raw_api_response.get('profileInfo', {})
+                social_info = raw_api_response.get('socialInfo', {})
+                
+                # Get values with fallbacks
+                nickname = formatted_response.get('nickname', basic_info.get('nickname', 'Not found'))
+                region = formatted_response.get('region', basic_info.get('region', 'Not found'))
+                level = basic_info.get('level', 'Not found')
+                exp = basic_info.get('exp', '?')
+                liked = basic_info.get('liked', 'Not found')
+                honor_score = credit_score_info.get('creditScore', 'Not found')
+                signature = social_info.get('signature', 'None')
+                release_version = basic_info.get('releaseVersion', '?')
+                badge_count = basic_info.get('badgeCnt', 'Not found')
+                br_rank_points = basic_info.get('rankingPoints', '?')
+                cs_rank_points = basic_info.get('csRankingPoints', '?')
+                created_at = basic_info.get('createAt', 'Not found')
+                last_login = basic_info.get('lastLoginAt', 'Not found')
+                avatar_id = profile_info.get('avatarId', 'Not found')
+                banner_id = basic_info.get('bannerId', 'Not found')
+                account_type = basic_info.get('accountType', '?')
+                title = basic_info.get('title', 'Not found')
+                max_rank = basic_info.get('maxRank', '?')
+                current_rank = basic_info.get('rank', '?')
+                
+                # Pet info
+                pet_name = pet_info.get('id', 'Not Found')
+                pet_exp = pet_info.get('exp', 'Not Found')
+                pet_level = pet_info.get('level', 'Not Found')
+                pet_equipped = pet_info.get('isSelected', False)
+                pet_skin_id = pet_info.get('skinId', 'Not Found')
+                pet_skill_id = pet_info.get('selectedSkillId', 'Not Found')
+                
+                # Profile info
+                equipped_skills = profile_info.get('equipedSkills', 'Not found')
+                clothes = profile_info.get('clothes', [])
+                skin_color = profile_info.get('skinColor', 'Not found')
+                is_selected_awaken = profile_info.get('isSelectedAwaken', False)
+                
+                # Social info
+                gender = social_info.get('gender', 'Not found')
+                language = social_info.get('language', 'Not found')
+                rank_show = social_info.get('rankShow', 'Not found')
+                time_active = social_info.get('timeActive', 'Not found')
+                
+                # Clan info
+                clan_name = clan_info.get('clanName', 'Not found')
+                clan_id = clan_info.get('clanId', 'Not found')
+                clan_level = clan_info.get('clanLevel', 'Not found')
+                clan_members = clan_info.get('memberNum', 'Not found')
+                clan_capacity = clan_info.get('capacity', '?')
+                clan_captain_id = clan_info.get('captainId', 'Not found')
+                
+                # Diamond cost
+                diamond_cost = raw_api_response.get('diamondCostRes', {}).get('diamondCost', '?')
+                
+            else:
+                # Fallback to old structure
                 basic_info = data.get('basicInfo', {})
-                captain_info = data.get('captainBasicInfo', {})
                 clan_info = data.get('clanBasicInfo', {})
                 credit_score_info = data.get('creditScoreInfo', {})
                 pet_info = data.get('petInfo', {})
                 profile_info = data.get('profileInfo', {})
                 social_info = data.get('socialInfo', {})
-            elif 'rawApiResponse' in data or 'formattedResponse' in data:
-                # Structure with rawApiResponse and formattedResponse
-                raw_response = data.get('rawApiResponse', data.get('basicInfo', {}))
-                formatted_response = data.get('formattedResponse', data.get('basicInfo', {}))
                 
-                # Use formatted response as primary source, fallback to raw response
-                basic_info = {**raw_response, **formatted_response}  # Merge both, formatted takes precedence
-                captain_info = {}
-                clan_info = {}
-                credit_score_info = {}
-                pet_info = {}
-                profile_info = {}
-                social_info = {}
-            else:
-                # Direct structure - try to identify and extract the actual data
-                basic_info = {}
-                captain_info = {}
-                clan_info = {}
-                credit_score_info = {}
-                pet_info = {}
-                profile_info = {}
-                social_info = {}
-                
-                # Look for known fields in the top level response
-                for key, value in data.items():
-                    if isinstance(value, dict):
-                        # Check if this nested object contains player info
-                        if any(player_key in value for player_key in ['accountId', 'nickname', 'level']):
-                            if 'accountId' in value:
-                                basic_info = value
-                                break
-                    elif key in ['nickname', 'accountId', 'region', 'level', 'exp', 'liked']:
-                        basic_info[key] = value
-                
-                # If we couldn't find basic info in nested objects, use the top level
-                if not basic_info and isinstance(data, dict):
-                    basic_info = data
-            
-            # Extract all possible values with extensive fallbacks based on the API response structure
-            nickname = basic_info.get('nickname', basic_info.get('name', basic_info.get('playerName', data.get('nickname', data.get('name', 'Not found')))))
-            region = basic_info.get('region', basic_info.get('Region', data.get('region', data.get('Region', 'Not found'))))
-            level = basic_info.get('level', basic_info.get('playerLevel', basic_info.get('AccountLevel', data.get('level', data.get('playerLevel', 'Not found')))))
-            exp = basic_info.get('exp', basic_info.get('experience', basic_info.get('Exp', data.get('exp', data.get('experience', '?')))))
-            liked = basic_info.get('liked', basic_info.get('likes', basic_info.get('Likes', data.get('liked', data.get('likes', 'Not found')))))
-            honor_score = credit_score_info.get('creditScore', basic_info.get('honorScore', basic_info.get('CreditScore', data.get('creditScore', data.get('honorScore', 'Not found')))))
-            signature = social_info.get('signature', basic_info.get('signature', basic_info.get('Signature', data.get('signature', 'None') or 'None')))
-            release_version = basic_info.get('releaseVersion', basic_info.get('latestOB', basic_info.get('ReleaseVersion', data.get('releaseVersion', data.get('latestOB', '?')))))
-            badge_count = basic_info.get('badgeCnt', basic_info.get('badges', basic_info.get('BadgeCount', data.get('badgeCnt', data.get('badges', 'Not found')))))
-            br_rank_points = basic_info.get('rankingPoints', basic_info.get('brRank', basic_info.get('BrRankPoints', data.get('rankingPoints', data.get('brRank', '?')))))
-            cs_rank_points = basic_info.get('csRankingPoints', basic_info.get('csRank', basic_info.get('CsRankPoints', data.get('csRankingPoints', data.get('csRank', '?')))))
-            created_at = basic_info.get('createAt', basic_info.get('createdAt', basic_info.get('CreateAt', data.get('createAt', data.get('createdAt', 'Not found')))))
-            last_login = basic_info.get('lastLoginAt', basic_info.get('lastLoginTime', basic_info.get('LastLoginAt', data.get('lastLoginAt', data.get('lastLoginTime', 'Not found')))))
-            avatar_id = profile_info.get('avatarId', basic_info.get('avatarId', basic_info.get('AvatarId', data.get('avatarId', data.get('AvatarId', 'Not found')))))
-            banner_id = basic_info.get('bannerId', basic_info.get('BannerId', data.get('bannerId', data.get('BannerId', 'Not found'))))
-            pin_id_raw = captain_info.get('pinId', basic_info.get('pinId', basic_info.get('PinId', data.get('pinId', data.get('PinId', 'Default')))))
-            pin_id = pin_id_raw if captain_info else 'Default'
-            equipped_skills = profile_info.get('equipedSkills', basic_info.get('equippedSkills', basic_info.get('EquippedSkills', data.get('equipedSkills', data.get('equippedSkills', 'Not found')))))
-            pet_equipped_nested = data.get('petEquipped', False)
-            pet_equipped = pet_info.get('isSelected', basic_info.get('petEquipped', basic_info.get('PetEquipped', data.get('isSelected', pet_equipped_nested))))
-            pet_name_raw = pet_info.get('name', basic_info.get('petName', basic_info.get('PetName', data.get('name', data.get('petName', 'Not Found')))))
-            pet_name = pet_name_raw if pet_info else 'Not Found'
-            pet_exp = pet_info.get('exp', basic_info.get('petExp', basic_info.get('PetExp', data.get('exp', data.get('petExp', 'Not Found')))))
-            pet_level = pet_info.get('level', basic_info.get('petLevel', basic_info.get('PetLevel', data.get('level', data.get('petLevel', 'Not Found')))))
+                nickname = basic_info.get('nickname', 'Not found')
+                region = basic_info.get('region', 'Not found')
+                level = basic_info.get('level', 'Not found')
+                exp = basic_info.get('exp', '?')
+                liked = basic_info.get('liked', 'Not found')
+                honor_score = credit_score_info.get('creditScore', 'Not found')
+                signature = social_info.get('signature', 'None')
+                release_version = basic_info.get('releaseVersion', '?')
+                badge_count = basic_info.get('badgeCnt', 'Not found')
+                br_rank_points = basic_info.get('rankingPoints', '?')
+                cs_rank_points = basic_info.get('csRankingPoints', '?')
+                created_at = basic_info.get('createAt', 'Not found')
+                last_login = basic_info.get('lastLoginAt', 'Not found')
+                avatar_id = profile_info.get('avatarId', 'Not found')
+                banner_id = basic_info.get('bannerId', 'Not found')
+                account_type = basic_info.get('accountType', '?')
+                title = basic_info.get('title', 'Not found')
+                max_rank = basic_info.get('maxRank', '?')
+                current_rank = basic_info.get('rank', '?')
+                pet_name = pet_info.get('id', 'Not Found')
+                pet_exp = pet_info.get('exp', 'Not Found')
+                pet_level = pet_info.get('level', 'Not Found')
+                pet_equipped = pet_info.get('isSelected', False)
+                equipped_skills = profile_info.get('equipedSkills', 'Not found')
+                clothes = profile_info.get('clothes', [])
+                skin_color = profile_info.get('skinColor', 'Not found')
+                is_selected_awaken = profile_info.get('isSelectedAwaken', False)
+                gender = social_info.get('gender', 'Not found')
+                language = social_info.get('language', 'Not found')
+                rank_show = social_info.get('rankShow', 'Not found')
+                time_active = social_info.get('timeActive', 'Not found')
+                clan_name = clan_info.get('clanName', 'Not found')
+                clan_id = clan_info.get('clanId', 'Not found')
+                clan_level = clan_info.get('clanLevel', 'Not found')
+                clan_members = clan_info.get('memberNum', 'Not found')
+                clan_capacity = clan_info.get('capacity', '?')
+                clan_captain_id = clan_info.get('captainId', 'Not found')
+                diamond_cost = data.get('diamondCostRes', {}).get('diamondCost', '?')
+                responding_region = 'Unknown'
+                pet_skin_id = pet_info.get('skinId', 'Not Found')
+                pet_skill_id = pet_info.get('selectedSkillId', 'Not Found')
 
+            # Create embed
             embed = discord.Embed(
-                title=" Player Information",
+                title=f"📊 Player Information - {nickname}",
                 color=discord.Color.blurple(),
                 timestamp=datetime.now()
             )
-            embed.set_thumbnail(url=ctx.author.display_avatar.url)
-
-            # Create basic info section with extensive fallbacks
-            basic_info_fields = [
-                "**┌  ACCOUNT BASIC INFO**",
-                f"**├─ Name**: {nickname}",
-                f"**├─ UID**: `{uid}`",
-                f"**├─ Level**: {level} (Exp: {exp})",
-                f"**├─ Region**: {region}",
-                f"**├─ Likes**: {liked}",
-                f"**├─ Honor Score**: {honor_score}",
-                f"**└─ Signature**: {signature}"
-            ]
-            embed.add_field(name="", value="\n".join(basic_info_fields), inline=False)
-          
-
-
-            # Create activity section with extensive fallbacks
-            activity_fields = [
-                "**┌  ACCOUNT ACTIVITY**",
-                f"**├─ Most Recent OB**: {release_version}",
-                f"**├─ Current BP Badges**: {badge_count}",
-                f"**├─ BR Rank**: {'' if basic_info.get('showBrRank', True) else 'Not found'} {br_rank_points} ",
-                f"**├─ CS Rank**: {'' if basic_info.get('showCsRank', True) else 'Not found'} {cs_rank_points} ",
-                f"**├─ Created At**: {self.convert_unix_timestamp(created_at)}",
-                f"**└─ Last Login**: {self.convert_unix_timestamp(last_login)}"
-
-            ]
-            embed.add_field(name="", value="\n".join(activity_fields), inline=False)
-
-            # Create overview section with extensive fallbacks
-            overview_fields = [
-                "**┌  ACCOUNT OVERVIEW**",
-                f"**├─ Avatar ID**: {avatar_id}",
-                f"**├─ Banner ID**: {banner_id}",
-                f"**├─ Pin ID**: {pin_id}",
-                f"**└─ Equipped Skills**: {equipped_skills}"
-            ]
-            embed.add_field(name="", value="\n".join(overview_fields), inline=False)
-
-            # Create pet details section with extensive fallbacks
-            pet_fields = [
-                "**┌  PET DETAILS**",
-                f"**├─ Equipped?**: {'Yes' if pet_equipped else 'Not Found'}",
-                f"**├─ Pet Name**: {pet_name}",
-                f"**├─ Pet Exp**: {pet_exp}",
-                f"**└─ Pet Level**: {pet_level}"
-            ]
-            embed.add_field(name="", value="\n".join(pet_fields), inline=False)
             
-            # Add any additional fields from the API response that weren't covered above
-            all_api_keys = set()
-            for d in [data, basic_info, captain_info, clan_info, credit_score_info, pet_info, profile_info, social_info]:
-                if isinstance(d, dict):
-                    all_api_keys.update(d.keys())
-                        
-            # Define keys that are already displayed
-            displayed_keys = {
-                'nickname', 'name', 'playerName', 'uid', 'level', 'playerLevel', 'exp', 'experience',
-                'region', 'Region', 'liked', 'likes', 'creditScore', 'honorScore', 'signature',
-                'releaseVersion', 'latestOB', 'badgeCnt', 'badges', 'rankingPoints', 'brRank',
-                'csRank', 'showBrRank', 'showCsRank', 'createAt', 'createdAt', 'lastLoginAt',
-                'lastLoginTime', 'avatarId', 'bannerId', 'pinId', 'equipedSkills', 'equippedSkills',
-                'isSelected', 'petEquipped', 'petName', 'petExp', 'petLevel', 'clanName', 'clanId',
-                'id', 'clanLevel', 'level', 'memberNum', 'members', 'capacity', 'maxMembers',
-                'accountId', 'title', 'exp', 'badgeCnt', 'badges', 'showBrRank', 'showCsRank',
-                'rankingPoints', 'brRank', 'csRankingPoints', 'csRank', 'basicInfo', 'captainBasicInfo',
-                'clanBasicInfo', 'creditScoreInfo', 'petInfo', 'profileInfo', 'socialInfo',
-                'captainInfo', 'clanInfo'
-            }
-                        
-            # Find additional keys not already displayed
-            additional_keys = all_api_keys - displayed_keys
-                        
-            if additional_keys:
-                additional_fields = ["**┌  ADDITIONAL DATA**"]
-                for key in sorted(additional_keys):
-                    if key not in ['basicInfo', 'captainBasicInfo', 'clanBasicInfo', 'creditScoreInfo', 'petInfo', 'profileInfo', 'socialInfo']:
-                        value = data.get(key, 'N/A')
-                        # Convert timestamp if needed
-                        if 'at' in key.lower() and str(value).isdigit():
-                            value = self.convert_unix_timestamp(value)
-                        # Ensure value is a string and limit its length
-                        value_str = str(value)[:100]  # Limit individual value length
-                        field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
-                        # Ensure the entire field string doesn't exceed limits
-                        field_str = f"**├─ {field_name}**: {value_str}"
-                        if len(field_str) > 1024:
-                            field_str = field_str[:1020] + "..."
-                        additional_fields.append(field_str)
-                additional_fields.append("**└─**")
-                embed.add_field(name="", value="\n".join(additional_fields), inline=False)
+            # Add player UID and region info
+            embed.add_field(
+                name="📋 Basic Information",
+                value=f"**UID:** `{uid}`\n"
+                      f"**Name:** {nickname}\n"
+                      f"**Region:** {region}\n"
+                      f"**API Region:** {responding_region}\n"
+                      f"**Account Type:** {account_type}\n"
+                      f"**Title:** {title}",
+                inline=True
+            )
             
-            # Handle clan info
-            final_clan_info = clan_info if clan_info else (data.get('clanInfo', {}) if 'clanInfo' in data else data.get('clan', {}))
-            final_captain_info = captain_info if captain_info else (data.get('captainInfo', {}) if 'captainInfo' in data else data.get('captain', {}))
-                        
-            if final_clan_info:
-                guild_info = [
-                    "**┌  GUILD INFO**",
-                    f"**├─ Guild Name**: {final_clan_info.get('clanName', final_clan_info.get('name', 'Not found'))}",
-                    f"**├─ Guild ID**: `{final_clan_info.get('clanId', final_clan_info.get('id', 'Not found'))}`",
-                    f"**├─ Guild Level**: {final_clan_info.get('clanLevel', final_clan_info.get('level', 'Not found'))}",
-                    f"**├─ Live Members**: {final_clan_info.get('memberNum', final_clan_info.get('members', 'Not found'))}/{final_clan_info.get('capacity', final_clan_info.get('maxMembers', '?'))}"
-                ]
-                if final_captain_info:
-                    guild_info.extend([
-                        "**└─ Leader Info**:",
-                        f"    **├─ Leader Name**: {final_captain_info.get('nickname', final_captain_info.get('name', 'Not found'))}",
-                        f"    **├─ Leader UID**: `{final_captain_info.get('accountId', final_captain_info.get('id', 'Not found'))}`",
-                        f"    **├─ Leader Level**: {final_captain_info.get('level', final_captain_info.get('level', 'Not found'))} (Exp: {final_captain_info.get('exp', final_captain_info.get('experience', '?'))})",
-                        f"    **├─ Last Login**: {self.convert_unix_timestamp(final_captain_info.get('lastLoginAt', final_captain_info.get('lastLoginTime', 'Not found')))}",
-                        f"    **├─ Title**: {final_captain_info.get('title', final_captain_info.get('title', 'Not found'))}",
-                        f"    **├─ BP Badges**: {final_captain_info.get('badgeCnt', final_captain_info.get('badges', '?'))}",
-                        f"    **├─ BR Rank**: {'' if final_captain_info.get('showBrRank', True) else 'Not found'} {final_captain_info.get('rankingPoints', final_captain_info.get('brRank', 'Not found'))}",
-                        f"    **└─ CS Rank**: {'' if final_captain_info.get('showCsRank', True) else 'Not found'} {final_captain_info.get('csRankingPoints', final_captain_info.get('csRank', 'Not found'))} "
-                    ])
-                embed.add_field(name="", value="\n".join(guild_info), inline=False)
+            # Add stats section
+            embed.add_field(
+                name="📈 Player Stats",
+                value=f"**Level:** {level}\n"
+                      f"**Experience:** {exp}\n"
+                      f"**Likes:** {liked}\n"
+                      f"**Honor Score:** {honor_score}\n"
+                      f"**Badges:** {badge_count}",
+                inline=True
+            )
+            
+            # Add rank information
+            embed.add_field(
+                name="🏆 Rank Information",
+                value=f"**Current BR Rank:** {current_rank}\n"
+                      f"**Max BR Rank:** {max_rank}\n"
+                      f"**BR Points:** {br_rank_points}\n"
+                      f"**CS Rank:** {basic_info.get('csRank', '?')}\n"
+                      f"**CS Points:** {cs_rank_points}",
+                inline=False
+            )
+            
+            # Add activity information
+            embed.add_field(
+                name="🕒 Activity",
+                value=f"**Created:** {self.convert_unix_timestamp(created_at)}\n"
+                      f"**Last Login:** {self.convert_unix_timestamp(last_login)}\n"
+                      f"**Version:** {release_version}\n"
+                      f"**Season:** {basic_info.get('seasonId', '?')}",
+                inline=True
+            )
+            
+            # Add equipment and profile information
+            equipment_text = f"**Avatar ID:** {avatar_id}\n"
+            equipment_text += f"**Banner ID:** {banner_id}\n"
+            equipment_text += f"**Skin Color:** {skin_color}\n"
+            equipment_text += f"**Awaken:** {'Yes' if is_selected_awaken else 'No'}\n"
+            equipment_text += f"**Clothes:** {len(clothes)} items"
+            
+            embed.add_field(
+                name="🎮 Equipment",
+                value=equipment_text,
+                inline=True
+            )
+            
+            # Add social information
+            social_text = f"**Gender:** {gender.replace('Gender_', '')}\n"
+            social_text += f"**Language:** {language.replace('Language_', '')}\n"
+            social_text += f"**Rank Display:** {rank_show.replace('RankShow_', '')}\n"
+            social_text += f"**Active Time:** {time_active.replace('TimeActive_', '')}\n"
+            social_text += f"**Signature:** {signature[:50]}..."
+            
+            embed.add_field(
+                name="👥 Social",
+                value=social_text,
+                inline=True
+            )
+            
+            # Add pet information
+            pet_text = f"**Equipped:** {'Yes' if pet_equipped else 'No'}\n"
+            pet_text += f"**Pet ID:** {pet_name}\n"
+            pet_text += f"**Level:** {pet_level}\n"
+            pet_text += f"**Experience:** {pet_exp}\n"
+            pet_text += f"**Skin ID:** {pet_skin_id}\n"
+            pet_text += f"**Skill ID:** {pet_skill_id}"
+            
+            embed.add_field(
+                name="🐾 Pet",
+                value=pet_text,
+                inline=True
+            )
+            
+            # Add clan information
+            if clan_name != 'Not found':
+                clan_text = f"**Name:** {clan_name}\n"
+                clan_text += f"**ID:** `{clan_id}`\n"
+                clan_text += f"**Level:** {clan_level}\n"
+                clan_text += f"**Members:** {clan_members}/{clan_capacity}\n"
+                clan_text += f"**Captain ID:** `{clan_captain_id}`"
+                
+                embed.add_field(
+                    name="🏰 Clan/Guild",
+                    value=clan_text,
+                    inline=True
+                )
+            
+            # Add diamond cost
+            embed.add_field(
+                name="💎 Diamond Cost",
+                value=f"**Cost:** {diamond_cost} diamonds",
+                inline=True
+            )
+            
+            # Add equipped skills
+            if isinstance(equipped_skills, list):
+                skills_text = f"**Skills Count:** {len(equipped_skills)}\n"
+                if len(equipped_skills) > 0:
+                    skills_text += f"**First Skill:** {equipped_skills[0]}\n"
+                if len(equipped_skills) > 1:
+                    skills_text += f"**Last Skill:** {equipped_skills[-1]}"
+            else:
+                skills_text = "No skills data"
+            
+            embed.add_field(
+                name="⚔️ Equipped Skills",
+                value=skills_text,
+                inline=True
+            )
+            
+            # Add weapon skins
+            weapon_skins = basic_info.get('weaponSkinShows', [])
+            if weapon_skins:
+                weapons_text = f"**Weapons:** {len(weapon_skins)}\n"
+                weapons_text += f"**First:** {weapon_skins[0]}\n"
+                if len(weapon_skins) > 1:
+                    weapons_text += f"**Last:** {weapon_skins[-1]}"
+            else:
+                weapons_text = "No weapon skins"
+            
+            embed.add_field(
+                name="🔫 Weapon Skins",
+                value=weapons_text,
+                inline=True
+            )
 
-
-
-            embed.set_footer(text="DEVELOPED BY LINUX")
+            embed.set_footer(text=f"DEVELOPED BY LINUX • Requested by {ctx.author.display_name}")
+            
             await ctx.send(embed=embed)
 
-            if region and uid:
+            # Generate and send profile image if available
+            if uid:
                 try:
                     image_url = f"{self.generate_url}?uid={uid}"
-                    print(f"Url d'image = {image_url}")
+                    print(f"Image URL = {image_url}")
                     if image_url:
                         async with self.session.get(image_url) as img_file:
                             if img_file.status == 200:
                                 with io.BytesIO(await img_file.read()) as buf:
                                     file = discord.File(buf, filename=f"outfit_{uuid.uuid4().hex[:8]}.png")
-                                    await ctx.send(file=file)  # ✅ ENVOYER L'IMAGE
-                                    print("Image envoyée avec succès")
+                                    await ctx.send(file=file)
+                                    print("Image sent successfully")
                             else:
-                                print(f"Erreur HTTP: {img_file.status}")
+                                print(f"HTTP Error: {img_file.status}")
                 except Exception as e:
                     print("Image generation failed:", e)
 
@@ -432,7 +491,6 @@ class InfoCommands(commands.Cog):
 
         try:
             async with ctx.typing():
-                # Use the new API endpoint you provided
                 async with self.session.get(f"https://api-info-v1.vercel.app/check?uid={uid}") as response:
                     if response.status == 404:
                         return await ctx.send(f" Player with UID `{uid}` not found.")
@@ -443,91 +501,93 @@ class InfoCommands(commands.Cog):
                     
                     # Create embed based on API response
                     embed = discord.Embed(
-                        title="Player Check Result",
+                        title="Player Check Result - API v1",
                         color=discord.Color.green(),
                         timestamp=datetime.now()
                     )
                     
-                    # Process the API response and create appropriate embed fields
-                    if isinstance(data, dict):
-                        # Handle special nested structures like rawApiResponse and formattedResponse
-                        if 'rawApiResponse' in data or 'formattedResponse' in data:
-                            # Flatten these nested structures
-                            for key, value in data.items():
-                                if isinstance(value, dict):
-                                    # Add nested fields with prefixes
-                                    for nested_key, nested_value in value.items():
-                                        field_name = f"{key.replace('Response', '')}.{nested_key}".replace('Api.', 'API ').replace('formatted.', 'Formatted ').title()
-                                        field_value = str(nested_value) if nested_value is not None else "N/A"
-                                        
-                                        # Handle timestamp conversions
-                                        if 'at' in nested_key.lower() and str(nested_value).isdigit():
-                                            field_value = self.convert_unix_timestamp(nested_value)
-                                        
-                                        # Limit field name length and value length for Discord embed limits
-                                        field_name = field_name[:256]  # Max field name length
-                                        field_value = field_value[:1024]  # Max field value length
-                                        
-                                        # Ensure the total field string doesn't exceed limits
-                                        total_field_length = len(field_name) + len(field_value)
-                                        if total_field_length > 1024:
-                                            # Reduce the value length to fit within limits
-                                            available_space = 1024 - len(field_name) - 10  # Leave some space for formatting
-                                            if available_space > 0:
-                                                field_value = field_value[:available_space] + "..."
-                                        
-                                        embed.add_field(name=field_name, value=field_value, inline=False)
-                                else:
-                                    # Handle direct fields
-                                    field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
-                                    field_value = str(value) if value is not None else "N/A"
-                                    
-                                    # Handle timestamp conversions
-                                    if 'at' in key.lower() and str(value).isdigit():
-                                        field_value = self.convert_unix_timestamp(value)
-                                    
-                                    # Limit field name length and value length for Discord embed limits
-                                    field_name = field_name[:256]  # Max field name length
-                                    field_value = field_value[:1024]  # Max field value length
-                                    
-                                    # Ensure the total field string doesn't exceed limits
-                                    total_field_length = len(field_name) + len(field_value)
-                                    if total_field_length > 1024:
-                                        # Reduce the value length to fit within limits
-                                        available_space = 1024 - len(field_name) - 10  # Leave some space for formatting
-                                        if available_space > 0:
-                                            field_value = field_value[:available_space] + "..."
-                                    
-                                    embed.add_field(name=field_name, value=field_value, inline=False)
-                        else:
-                            # Process normal dictionary structure
-                            for key, value in data.items():
-                                # Handle timestamp conversions
-                                if 'at' in key.lower() and value and str(value).isdigit():
-                                    # This is likely a timestamp field
-                                    converted_time = self.convert_unix_timestamp(int(value))
-                                    field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
-                                    field_value = converted_time
-                                else:
-                                    # Regular field
-                                    field_name = str(key).replace('At', ' Time').replace('_', ' ').title()
-                                    field_value = str(value) if value is not None else "N/A"
-                                
-                                # Limit field name length and value length for Discord embed limits
-                                field_name = field_name[:256]  # Max field name length
-                                field_value = field_value[:1024]  # Max field value length
-                                
-                                # Ensure the total field string doesn't exceed limits
-                                total_field_length = len(field_name) + len(field_value)
-                                if total_field_length > 1024:
-                                    # Reduce the value length to fit within limits
-                                    available_space = 1024 - len(field_name) - 10  # Leave some space for formatting
-                                    if available_space > 0:
-                                        field_value = field_value[:available_space] + "..."
-                                
-                                embed.add_field(name=field_name, value=field_value, inline=False)
+                    # Check for new API format
+                    if 'formatted_response' in data or 'raw_api_response' in data:
+                        formatted_response = data.get('formatted_response', {})
+                        raw_api_response = data.get('raw_api_response', {})
+                        responding_region = data.get('responding_region', 'Unknown')
+                        
+                        # Add formatted response info
+                        embed.add_field(
+                            name="📋 Formatted Response",
+                            value=f"**Nickname:** {formatted_response.get('nickname', 'N/A')}\n"
+                                  f"**Region:** {formatted_response.get('region', 'N/A')}",
+                            inline=True
+                        )
+                        
+                        # Add API region info
+                        embed.add_field(
+                            name="🌍 API Region",
+                            value=f"**Responding Region:** {responding_region}",
+                            inline=True
+                        )
+                        
+                        # Add raw response summary
+                        if 'basicInfo' in raw_api_response:
+                            basic_info = raw_api_response['basicInfo']
+                            embed.add_field(
+                                name="👤 Basic Info",
+                                value=f"**Level:** {basic_info.get('level', 'N/A')}\n"
+                                      f"**Exp:** {basic_info.get('exp', 'N/A')}\n"
+                                      f"**Likes:** {basic_info.get('liked', 'N/A')}",
+                                inline=True
+                            )
+                        
+                        if 'clanBasicInfo' in raw_api_response:
+                            clan_info = raw_api_response['clanBasicInfo']
+                            embed.add_field(
+                                name="🏰 Clan Info",
+                                value=f"**Name:** {clan_info.get('clanName', 'N/A')}\n"
+                                      f"**Level:** {clan_info.get('clanLevel', 'N/A')}\n"
+                                      f"**Members:** {clan_info.get('memberNum', 'N/A')}",
+                                inline=True
+                            )
+                        
+                        # Show raw data count
+                        embed.add_field(
+                            name="📊 Data Summary",
+                            value=f"**Fields in Response:** {len(data)}\n"
+                                  f"**Raw API Fields:** {len(raw_api_response)}\n"
+                                  f"**Formatted Fields:** {len(formatted_response)}",
+                            inline=True
+                        )
+                        
                     else:
-                        embed.add_field(name="Response", value=str(data)[:1024], inline=False)
+                        # Handle old structure
+                        embed.add_field(
+                            name="📋 Response Structure",
+                            value="Old API structure detected",
+                            inline=False
+                        )
+                        
+                        # Add some basic fields if available
+                        for key, value in data.items():
+                            if isinstance(value, dict):
+                                # Count nested items
+                                embed.add_field(
+                                    name=f"📁 {key}",
+                                    value=f"{len(value)} items",
+                                    inline=True
+                                )
+                            elif isinstance(value, list):
+                                # Count list items
+                                embed.add_field(
+                                    name=f"📋 {key}",
+                                    value=f"{len(value)} items",
+                                    inline=True
+                                )
+                            elif key in ['nickname', 'region', 'level']:
+                                # Show important fields
+                                embed.add_field(
+                                    name=f"📝 {key}",
+                                    value=str(value)[:50],
+                                    inline=True
+                                )
                     
                     embed.set_footer(text="API v1 Check | DEVELOPED BY LINUX")
                     await ctx.send(embed=embed)
