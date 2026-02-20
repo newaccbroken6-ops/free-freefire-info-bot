@@ -23,9 +23,8 @@ class InfoCommands(commands.Cog):
         self.config_data = self.load_config()
         self.cooldowns = {}
 
-   
-
-    
+    # Lista dei canali permessi per il comando info
+    ALLOWED_INFO_CHANNELS = ["1449152600518819993", "1474371812052701327"]
 
     def convert_unix_timestamp(self, timestamp) -> str:
         try:
@@ -35,8 +34,6 @@ class InfoCommands(commands.Cog):
                 return str(timestamp) if timestamp else 'Not available'
         except (ValueError, TypeError):
             return str(timestamp) if timestamp else 'Not available'
-
-
 
     def check_request_limit(self, guild_id):
         try:
@@ -76,8 +73,6 @@ class InfoCommands(commands.Cog):
                 json.dump(self.config_data, f, indent=4, ensure_ascii=False)
         except IOError as e:
             print(f"Error saving config: {e}")
-
-
 
     async def is_channel_allowed(self, ctx):
         try:
@@ -151,15 +146,24 @@ class InfoCommands(commands.Cog):
     async def player_info(self, ctx: commands.Context, uid: str):
         guild_id = str(ctx.guild.id)
         
-        # Restrict to specific channel
-        if str(ctx.channel.id) != "1449152600518819993""1474371812052701327":
-            return await ctx.send(" This command can only be used in the designated channel.", ephemeral=True)
+        # Restrict to specific channels (both IDs now allowed)
+        if str(ctx.channel.id) not in self.ALLOWED_INFO_CHANNELS:
+            allowed_channels_mentions = []
+            for channel_id in self.ALLOWED_INFO_CHANNELS:
+                channel = ctx.guild.get_channel(int(channel_id))
+                if channel:
+                    allowed_channels_mentions.append(channel.mention)
+                else:
+                    allowed_channels_mentions.append(f"<#{channel_id}>")
+            
+            channels_text = ", ".join(allowed_channels_mentions)
+            return await ctx.send(f"❌ This command can only be used in the designated channels: {channels_text}", ephemeral=True)
 
         if not uid.isdigit() or len(uid) < 6:
-            return await ctx.reply(" Invalid UID! It must:\n- Be only numbers\n- Have at least 6 digits", mention_author=False)
+            return await ctx.reply("❌ Invalid UID! It must:\n- Be only numbers\n- Have at least 6 digits", mention_author=False)
 
         if not await self.is_channel_allowed(ctx):
-            return await ctx.send(" This command is not allowed in this channel.", ephemeral=True)
+            return await ctx.send("❌ This command is not allowed in this channel.", ephemeral=True)
 
         cooldown = self.config_data["global_settings"]["default_cooldown"]
         if guild_id in self.config_data["servers"]:
@@ -169,7 +173,7 @@ class InfoCommands(commands.Cog):
             last_used = self.cooldowns[ctx.author.id]
             if (datetime.now() - last_used).seconds < cooldown:
                 remaining = cooldown - (datetime.now() - last_used).seconds
-                return await ctx.send(f" Please wait {remaining}s before using this command again", ephemeral=True)
+                return await ctx.send(f"⏳ Please wait {remaining}s before using this command again", ephemeral=True)
 
         self.cooldowns[ctx.author.id] = datetime.now()
        
@@ -177,9 +181,9 @@ class InfoCommands(commands.Cog):
             async with ctx.typing():
                 async with self.session.get(f"https://api-info-v1.vercel.app/check?uid={uid}") as response:
                     if response.status == 404:
-                        return await ctx.send(f" Player with UID `{uid}` not found.")
+                        return await ctx.send(f"❌ Player with UID `{uid}` not found.")
                     if response.status != 200:
-                        return await ctx.send("API error. Try again later.")
+                        return await ctx.send("⚠️ API error. Try again later.")
                     data = await response.json()
             
             # Extract data from the new API format
@@ -475,7 +479,7 @@ class InfoCommands(commands.Cog):
                     print("GIF sending failed:", e)
 
         except Exception as e:
-            await ctx.send(f" Unexpected error: `{e}`")
+            await ctx.send(f"❌ Unexpected error: `{e}`")
         finally:
             gc.collect()
 
@@ -485,15 +489,24 @@ class InfoCommands(commands.Cog):
         """Command to use the new API endpoint you provided"""
         guild_id = str(ctx.guild.id)
         
-        # Restrict to specific channel
-        if str(ctx.channel.id) != "1449152600518819993":
-            return await ctx.send(" This command can only be used in the designated channel.", ephemeral=True)
+        # Restrict to specific channels (both IDs now allowed)
+        if str(ctx.channel.id) not in self.ALLOWED_INFO_CHANNELS:
+            allowed_channels_mentions = []
+            for channel_id in self.ALLOWED_INFO_CHANNELS:
+                channel = ctx.guild.get_channel(int(channel_id))
+                if channel:
+                    allowed_channels_mentions.append(channel.mention)
+                else:
+                    allowed_channels_mentions.append(f"<#{channel_id}>")
+            
+            channels_text = ", ".join(allowed_channels_mentions)
+            return await ctx.send(f"❌ This command can only be used in the designated channels: {channels_text}", ephemeral=True)
 
         if not uid.isdigit() or len(uid) < 6:
-            return await ctx.reply(" Invalid UID! It must:\n- Be only numbers\n- Have at least 6 digits", mention_author=False)
+            return await ctx.reply("❌ Invalid UID! It must:\n- Be only numbers\n- Have at least 6 digits", mention_author=False)
 
         if not await self.is_channel_allowed(ctx):
-            return await ctx.send(" This command is not allowed in this channel.", ephemeral=True)
+            return await ctx.send("❌ This command is not allowed in this channel.", ephemeral=True)
 
         cooldown = self.config_data["global_settings"]["default_cooldown"]
         if guild_id in self.config_data["servers"]:
@@ -503,7 +516,7 @@ class InfoCommands(commands.Cog):
             last_used = self.cooldowns[ctx.author.id]
             if (datetime.now() - last_used).seconds < cooldown:
                 remaining = cooldown - (datetime.now() - last_used).seconds
-                return await ctx.send(f" Please wait {remaining}s before using this command again", ephemeral=True)
+                return await ctx.send(f"⏳ Please wait {remaining}s before using this command again", ephemeral=True)
 
         self.cooldowns[ctx.author.id] = datetime.now()
 
@@ -511,9 +524,9 @@ class InfoCommands(commands.Cog):
             async with ctx.typing():
                 async with self.session.get(f"https://api-info-v1.vercel.app/check?uid={uid}") as response:
                     if response.status == 404:
-                        return await ctx.send(f" Player with UID `{uid}` not found.")
+                        return await ctx.send(f"❌ Player with UID `{uid}` not found.")
                     if response.status != 200:
-                        return await ctx.send("API error. Try again later.")
+                        return await ctx.send("⚠️ API error. Try again later.")
                     
                     data = await response.json()
                     
@@ -621,7 +634,7 @@ class InfoCommands(commands.Cog):
                     print("GIF sending failed:", e)
 
         except Exception as e:
-            await ctx.send(f" Unexpected error: `{e}`")
+            await ctx.send(f"❌ Unexpected error: `{e}`")
         finally:
             gc.collect()
 
@@ -650,8 +663,6 @@ class InfoCommands(commands.Cog):
             description="The Free Fire API is not responding. Try again later.",
             color=0xF39C12
         ))
-
-
 
 async def setup(bot):
     await bot.add_cog(InfoCommands(bot))
