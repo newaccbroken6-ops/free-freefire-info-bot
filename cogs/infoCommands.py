@@ -152,7 +152,7 @@ class InfoCommands(commands.Cog):
         guild_id = str(ctx.guild.id)
         
         # Restrict to specific channel
-        if str(ctx.channel.id) != "1449152600518819993":
+        if str(ctx.channel.id) != "1449152600518819993""1474371812052701327":
             return await ctx.send(" This command can only be used in the designated channel.", ephemeral=True)
 
         if not uid.isdigit() or len(uid) < 6:
